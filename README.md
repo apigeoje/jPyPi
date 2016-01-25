@@ -1,2 +1,4 @@
 # jPyPi
-Rasperrby Pi Python Development
+Raspberry Pi Python Development
+
+## motion detection python script for PiCam
