@@ -34,7 +34,7 @@ RETRIABLE_EXCEPTIONS = (httplib2.HttpLib2Error, IOError, httplib.NotConnected,
 # codes is raised.
 RETRIABLE_STATUS_CODES = [500, 502, 503, 504]
 
-CLIENT_SECRETS_FILE = "/home/jeremy/jPyPi/client_secrets.json"
+CLIENT_SECRETS_FILE = PATH_TO_CLIENT_SECRETS
 MISSING_CLIENT_SECRETS_MESSAGE = "Missing client secrets message"
 # This OAuth 2.0 access scope allows an application to upload files to the
 # authenticated user's YouTube channel, but doesn't allow other types of access.
@@ -193,7 +193,7 @@ if __name__ == '__main__':
     argparser.add_argument("--privacyStatus", 
                  default=YOUTUBE_PRIVACY_STATUS, help="Video privacy status.")
     args = argparser.parse_args()
-    meta = dict(who="Bump",when=int(time.time()), where="here",filmer="Jeremy")
+    meta = dict(who="BDo",when=int(time.time()), where="here",filmer="Bob")
 
     upl = jYouTubeUploader(None, meta, args)
     upl.start()
