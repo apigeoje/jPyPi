@@ -57,11 +57,11 @@ exitFlag = 0
 # where streams will be saved before concatenation
 TEMP_STORAGE_PATH = ''
 # where concatenated files will be stored
-OUTPUT_STORAGE_PATH = '/home/jeremy/Videos/'
+OUTPUT_STORAGE_PATH = '/home/pi/Videos/'
 # resolution
-CAMERA_RESOLUTION = (640,480)
+CAMERA_RESOLUTION = (1296,730)
 # bitrate
-CAMERA_BITRATE = 700000
+CAMERA_BITRATE = 1000000
 # length of circular buffer and time recorded before a triggered event
 BUFFER_SECS = 5 
 # the pin number
@@ -71,7 +71,8 @@ MONITOR_SPLITTER = 1
 STREAM_SPLITTER = 2
 # ffmpeg
 FFMPEG_BIN = "ffmpeg"
-
+# how big a movement stream is significant
+SIGNIFICANT_STREAM_SIZE = 2500000
 
 '''-----------------------------------------
   Helper functions
@@ -82,7 +83,7 @@ def write_video(stream, filename):
     # lock the stream here as we're definitely not writing to it
     # simultaneously
     
-    with io.open(TEMP_STORAGE_PATH + filename, 'wb') as output:
+    with io.open(TEMP_STORAGE_PATH + filename+'.h264', 'wb') as output:
         if isinstance(stream, picamera.streams.PiCameraCircularIO):
             for frame in stream.frames:
                 if frame.frame_type == picamera.PiVideoFrameType.sps_header:
@@ -93,8 +94,10 @@ def write_video(stream, filename):
                 if not buf:
                     break
                 output.write(buf)
+            retFileSize = 0
 
         elif isinstance(stream, io.BytesIO):
+            retFileSize = stream.tell()
             stream.seek(0)
             buf = stream.getvalue()
             output.write(buf)
@@ -105,23 +108,30 @@ def write_video(stream, filename):
         # clear the stream and prepare it for reuse
         stream.seek(0)
         stream.truncate()
+        return retFileSize
 
 def concat(clip, filename):
 
-    concatString = 'concat:'+clip+'|after'+clip
+    try:
+        concatString = 'concat:'+clip+'.h264|after'+clip+'.h264'
 
-    command = [ FFMPEG_BIN,
+        command = [ FFMPEG_BIN,
            '-y', # (optional) overwrite output file if it exists
            '-i', concatString,
            '-c', 'copy',
-           OUTPUT_STORAGE_PATH+'o'+filename ]
+           OUTPUT_STORAGE_PATH+filename ]
 
-    pipe = sp.Popen( command, stdin=sp.PIPE, stderr=sp.PIPE) 
+        pipe = sp.Popen( command, stdin=sp.PIPE, stderr=sp.PIPE) 
 
-    pipe.wait()
+        pipe.wait()
+        return True
+    except:
+        return False
 
-    os.remove(clip)
-    os.remove('after'+clip)
+
+def removeClipParts(clip):
+    os.remove(clip+'.h264')
+    os.remove('after'+clip+'.h264')
 
 
 '''------------------------------------------
@@ -134,6 +144,7 @@ class jBabyMonitor(threading.Thread):
         self.camera = camera
 
     def run(self):
+        time.sleep(1800)
         # create the circular buffer
         stream = picamera.PiCameraCircularIO(camera,
                                              seconds=BUFFER_SECS,
@@ -156,7 +167,7 @@ class jBabyMonitor(threading.Thread):
             # enter the loop
             while camera:
                 if not GPIO.input(SENSOR_CHANNEL):
-                    # wait for edge
+                    print '# wait for edge'
                     GPIO.wait_for_edge(SENSOR_CHANNEL, GPIO.RISING)
                 
                 # As soon as we detect motion, split the recording to
@@ -165,22 +176,30 @@ class jBabyMonitor(threading.Thread):
                 self.camera.split_recording(after,splitter_port=MONITOR_SPLITTER)
 
                 # build the output filename
-                outputFile = str(int(time.time())) + '.h264'
+                outputFile = str(int(time.time()))
 
                 # Write the "before" motion to disk as well
-                write_video(stream, outputFile)
+                beforeFileSize = write_video(stream, outputFile)
 
-                # Wait until motion is no longer detected
+                print '# Wait until motion is no longer detected'
                 GPIO.wait_for_edge(SENSOR_CHANNEL, GPIO.FALLING)
                 
                 # then split recording back to the in-memory circular buffer
                 self.camera.split_recording(stream,splitter_port=MONITOR_SPLITTER)
 
                 # Write the "after" motion to disk
-                write_video(after, 'after'+outputFile)
+                afterFileSize = write_video(after, 'after'+outputFile)
+                print afterFileSize
 
-                ## concatenate two file
-                concat(outputFile, outputFile)
+                if afterFileSize > 2500000:
+                    ## concatenate two file
+                    concatSuccess = concat(outputFile, outputFile+'.mpg')
+		    if concatSuccess:
+                        removeClipParts(outputFile)
+                    else:
+                        print 'Problem writing the compiled file,' + outputFile + '... do it manually later'
+                else:
+		    removeClipParts(outputFile)
 
         finally:
             self.camera.stop_recording()
