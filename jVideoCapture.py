@@ -59,7 +59,7 @@ APP_NAME = 'jBabyMonitor'
 # where streams will be saved before concatenation
 TEMP_STORAGE_PATH = ''
 # where concatenated files will be stored
-OUTPUT_STORAGE_PATH = '/home/pi/Videos/'
+OUTPUT_STORAGE_PATH = 'final destination'
 # resolution
 CAMERA_RESOLUTION = (1296,730)
 # bitrate
@@ -251,6 +251,9 @@ class jBabyMonitor(threading.Thread):
 
 
 class jBabyWebstream(threading.Thread):
+    '''
+    TODO
+    '''
     def __init__(self, camera):
         print 'jBabyWebstream has initiated'
         threading.Thread.__init__(self)
